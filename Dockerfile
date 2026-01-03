@@ -22,7 +22,7 @@ WORKDIR /root/
 
 # Copy the binary from builder
 COPY --from=builder /app/gemini-proxy .
-COPY --from=builder /app/.env.example .env
+# COPY --from=builder /app/.env.example .env
 
 # Create non-root user
 RUN adduser -D -g '' appuser && chown -R appuser:appuser /root/
