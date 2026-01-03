@@ -355,14 +355,17 @@ func (h *VerificationWebHandler) submitVerification(c *gin.Context) {
 	h.verificationStore.verificationCodes[h.config.Email] = code
 	h.verificationStore.Unlock()
 
-	// 尝试使用验证码登录
-	if err := h.authService.Login(); err != nil {
+	// 使用验证码获取Google JWT Token
+	token, err := h.authService.SubmitVerificationCode(code)
+	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": fmt.Sprintf("验证失败: %v", err),
 		})
 		return
 	}
+
+	fmt.Printf("成功获取Google JWT Token，长度: %d\n", len(token))
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

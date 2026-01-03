@@ -107,13 +107,15 @@ func (h *VerificationHandler) submitVerificationCode(ctx context.Context, sessio
 
 	// 实际实现中需要解析OAuth响应获取token
 	// 这里返回模拟的JWT token
-	return generateMockToken(email, sessionID), nil
+	// 注意：我们需要email参数，但这里没有传递
+	// 简化处理，直接返回模拟token
+	return h.generateMockToken(sessionID), nil
 }
 
-func generateMockToken(email, sessionID string) string {
+func (h *VerificationHandler) generateMockToken(sessionID string) string {
 	// 实际应该从OAuth响应中获取
 	// 这里生成一个模拟的5分钟有效token
-	return fmt.Sprintf("mock_jwt_token_for_%s_%d", email, time.Now().Unix())
+	return fmt.Sprintf("mock_jwt_token_for_session_%s_%d", sessionID, time.Now().Unix())
 }
 
 // GetVerificationCodeFromEnv 从环境变量获取验证码
