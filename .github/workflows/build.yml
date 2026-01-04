@@ -20,7 +20,7 @@ permissions:
 env:
   DOCKER_REPO: bailangvvking/gemini-business-proxy
   IMAGE_NAME: gemini-business-proxy
-  IMAGE_TAG: fast
+  IMAGE_TAG: latest
 
 jobs:
   build-and-push:
