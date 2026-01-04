@@ -35,17 +35,25 @@ func NewService(cfg *config.Config) (*AuthService, error) {
 			Timeout: 30 * time.Second,
 		},
 		jar: jar,
+		token: "",
+		lastLogin: time.Time{},
 	}
 	
-	// 初始化时自动发送验证码请求
-	ctx := context.Background()
-	if cfg.Gemini.AccountEmail != "" {
-		if err := service.SendVerificationRequest(ctx, cfg.Gemini.AccountEmail); err != nil {
-			log.Printf("Failed to send verification request: %v", err)
-		} else {
-			log.Printf("Verification code sent to %s", cfg.Gemini.AccountEmail)
+	// 异步发送验证码请求，不阻塞服务启动
+	go func() {
+		if cfg.Gemini.AccountEmail != "" {
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			
+			if err := service.SendVerificationRequest(ctx, cfg.Gemini.AccountEmail); err != nil {
+				log.Printf("Failed to send verification request: %v", err)
+				log.Printf("Note: You can manually trigger verification later via /auth/verify endpoint")
+			} else {
+				log.Printf("Verification code sent to %s", cfg.Gemini.AccountEmail)
+				log.Printf("Please check your email and submit the verification code to /auth/verify endpoint")
+			}
 		}
-	}
+	}()
 	
 	return service, nil
 }
@@ -133,33 +141,26 @@ func (s *AuthService) Login(ctx context.Context, email, verificationCode string)
 
 func (s *AuthService) GetToken() (string, error) {
 	// 检查令牌是否过期
-	if time.Since(s.lastLogin) > time.Duration(s.config.Gemini.SessionTimeout)*time.Second {
+	if s.token != "" && time.Since(s.lastLogin) > time.Duration(s.config.Gemini.SessionTimeout)*time.Second {
 		// 需要重新登录
+		s.token = ""
+		s.lastLogin = time.Time{}
 		return "", fmt.Errorf("token expired")
 	}
 	
-	// 如果令牌为空，尝试初始化登录
+	// 如果令牌为空，返回错误而不是尝试自动登录
 	if s.token == "" {
-		if err := s.initializeLogin(); err != nil {
-			return "", fmt.Errorf("failed to initialize login: %w", err)
-		}
+		return "", fmt.Errorf("not authenticated. Please send verification code to /auth/verify endpoint")
 	}
 	
 	return s.token, nil
 }
 
-func (s *AuthService) initializeLogin() error {
-	// 这里需要实现验证码的交互式获取
-	// 由于在Docker容器中无法直接交互，我们可以：
-	// 1. 通过环境变量预先设置验证码
-	// 2. 或者通过API接收验证码
-	// 3. 或者等待用户通过其他方式提供
+func (s *AuthService) InitializeLoginWithCode(verificationCode string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	
-	// 目前先返回模拟令牌
-	s.token = "simulated-auth-token-12345"
-	s.lastLogin = time.Now()
-	
-	return nil
+	return s.Login(ctx, s.config.Gemini.AccountEmail, verificationCode)
 }
 
 func (s *AuthService) extractAuthToken() (string, error) {
