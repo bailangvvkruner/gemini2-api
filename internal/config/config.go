@@ -2,49 +2,64 @@ package config
 
 import (
 	"os"
-	"time"
+	"strconv"
 )
 
 type Config struct {
-	// 必须的环境变量
-	Email    string // GEMINI_BUSINESS_EMAIL
-	ConfigID string // GEMINI_BUSINESS_CONFIG_ID
-
-	// 可选的环境变量
-	Port     string // PORT (默认: 8080)
-	LogLevel string // LOG_LEVEL (默认: info)
-
-	// API端点（固定值，无需配置）
-	UpstreamBaseURL string
-	AuthBaseURL     string
-
-	// 超时配置
-	HTTPTimeout time.Duration
+	Server struct {
+		Address string
+		Port    int
+	}
+	
+	Gemini struct {
+		BusinessURL    string
+		APIBaseURL     string
+		AuthURL        string
+		AccountEmail   string
+		SessionTimeout int
+		ConfigID       string
+	}
+	
+	OpenAICompatible struct {
+		Enabled       bool
+		APIKeyHeader  string
+		DefaultModel  string
+	}
+	
+	Logging struct {
+		Level  string
+		Format string
+	}
 }
 
-func Load() (*Config, error) {
-	// 从环境变量加载，没有默认值的必须提供
-	email := os.Getenv("GEMINI_BUSINESS_EMAIL")
-	if email == "" {
-		return nil, &ConfigError{Field: "GEMINI_BUSINESS_EMAIL", Message: "必须设置Gemini Business邮箱"}
-	}
-
-	configID := os.Getenv("GEMINI_BUSINESS_CONFIG_ID")
-	if configID == "" {
-		configID = "d06739ca-6683-46db-bb51-07395a392439" // 提供默认值
-	}
-
-	return &Config{
-		Email:           email,
-		ConfigID:        configID,
-		Port:            getEnv("PORT", "8080"),
-		LogLevel:        getEnv("LOG_LEVEL", "info"),
-		UpstreamBaseURL: "https://biz-discoveryengine.googleapis.com/v1alpha",
-		AuthBaseURL:     "https://accountverification.business.gemini.google",
-		HTTPTimeout:     30 * time.Second,
-	}, nil
+func LoadConfig() *Config {
+	cfg := &Config{}
+	
+	// 服务器配置
+	cfg.Server.Address = getEnv("SERVER_ADDRESS", "0.0.0.0")
+	cfg.Server.Port = getEnvAsInt("SERVER_PORT", 8080)
+	
+	// Gemini配置
+	cfg.Gemini.BusinessURL = getEnv("GEMINI_BUSINESS_URL", "https://business.gemini.google")
+	cfg.Gemini.APIBaseURL = getEnv("API_BASE_URL", "https://biz-discoveryengine.googleapis.com/v1alpha")
+	cfg.Gemini.AuthURL = getEnv("AUTH_URL", "https://auth.business.gemini.google")
+	cfg.Gemini.AccountEmail = getEnv("ACCOUNT_EMAIL", "")
+	cfg.Gemini.SessionTimeout = getEnvAsInt("SESSION_TIMEOUT", 1800)
+	cfg.Gemini.ConfigID = getEnv("CONFIG_ID", "d06739ca-6683-46db-bb51-07395a392439")
+	
+	// OpenAI兼容配置
+	cfg.OpenAICompatible.Enabled = getEnvAsBool("OPENAI_COMPATIBLE", true)
+	cfg.OpenAICompatible.APIKeyHeader = getEnv("API_KEY_HEADER", "Authorization")
+	cfg.OpenAICompatible.DefaultModel = getEnv("DEFAULT_MODEL", "gemini-business")
+	
+	// 日志配置
+	cfg.Logging.Level = getEnv("LOG_LEVEL", "info")
+	cfg.Logging.Format = getEnv("LOG_FORMAT", "json")
+	
+	return cfg
 }
 
+// 辅助函数
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -52,11 +67,20 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-type ConfigError struct {
-	Field   string
-	Message string
+func getEnvAsInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
 }
 
-func (e *ConfigError) Error() string {
-	return e.Field + ": " + e.Message
+func getEnvAsBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
+		}
+	}
+	return defaultValue
 }

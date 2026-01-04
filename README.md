@@ -1,5 +1,28 @@
 # Gemini Business API 代理服务
 
+### Docker快速部署
+
+```
+docker run -d \
+  --name gemini-proxy \
+  -e SERVER_ADDRESS=0.0.0.0 \
+  -e SERVER_PORT=8080 \
+  -e GEMINI_BUSINESS_URL=https://business.gemini.google \
+  -e API_BASE_URL=https://biz-discoveryengine.googleapis.com/v1alpha \
+  -e AUTH_URL=https://auth.business.gemini.google \
+  -e ACCOUNT_EMAIL=2123146130@qq.com \
+  -e SESSION_TIMEOUT=1800 \
+  -e OPENAI_COMPATIBLE=true \
+  -e API_KEY_HEADER=Authorization \
+  -e DEFAULT_MODEL=gemini-business \
+  -e LOG_LEVEL=info \
+  -e LOG_FORMAT=json \
+  -p 8080:8080 \
+  bailangvvking/gemini-business-proxy:latest
+```
+
+
+
 一个将OpenAI API格式转换为Gemini Business API的代理服务，支持Docker化部署。
 
 ## 功能特性

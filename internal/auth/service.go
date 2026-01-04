@@ -1,149 +1,170 @@
 package auth
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
+	"strings"
 	"time"
 
 	"gemini-business-proxy/internal/config"
 )
 
-// Service 定义认证服务接口
-type Service interface {
-	GetBearerToken() (string, error)
-	RequestVerificationCode() error
-	SubmitVerificationCode(code string) (string, error)
-}
-
-// CorrectAuthService 实现正确的Google OAuth认证流程
-type CorrectAuthService struct {
+type AuthService struct {
 	config     *config.Config
 	httpClient *http.Client
-	token      string    // 存储Google颁发的JWT Bearer Token
-	expiry     time.Time // Token过期时间
+	jar        *cookiejar.Jar
+	token      string
+	lastLogin  time.Time
 }
 
-func NewService(cfg *config.Config) Service {
-	return &CorrectAuthService{
-		config: cfg,
-		httpClient: &http.Client{
-			Timeout: cfg.HTTPTimeout,
-		},
-	}
-}
-
-// GetBearerToken 获取有效的Bearer Token
-func (s *CorrectAuthService) GetBearerToken() (string, error) {
-	// 如果token有效且未过期，直接返回
-	if s.token != "" && time.Now().Before(s.expiry) {
-		return s.token, nil
-	}
-
-	// Token过期或不存在，需要重新认证
-	return "", fmt.Errorf("需要重新认证，请访问 /verify 页面输入验证码")
-}
-
-// RequestVerificationCode 请求发送验证码到邮箱
-func (s *CorrectAuthService) RequestVerificationCode() error {
-	// 实际实现应该调用Google的验证码发送API
-	// 这里简化处理，实际应该使用正确的API端点
-	fmt.Printf("验证码已发送到邮箱: %s\n", s.config.Email)
-	fmt.Println("请查看您的邮箱，找到6位验证码")
-	return nil
-}
-
-// SubmitVerificationCode 提交验证码并获取JWT Token
-func (s *CorrectAuthService) SubmitVerificationCode(code string) (string, error) {
-	if len(code) != 6 {
-		return "", fmt.Errorf("验证码必须是6位字符")
-	}
-
-	fmt.Printf("正在验证代码: %s 对于邮箱: %s\n", code, s.config.Email)
-
-	// 模拟Google OAuth认证流程
-	// 实际应该调用: https://accountverification.business.gemini.google/oauth2/token
-	// 并处理完整的OAuth 2.0授权码流程
-
-	// 这里返回一个模拟的JWT Token结构
-	// 实际Token应该是从Google OAuth服务器获取的
-	s.token = fmt.Sprintf("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IldBQS5BY2c4ZXVGUXF0WEVISkZYUTJMcVU4TFlnR2p0OUt1dHhjaGFHR1hWNDRZNTZCWW1ZQS1CUTNfY0Q3MW1NTWVIX1cyT3RRc1dMdTIxLXU5MTNRUmt6YzJMUzhOVHp4MGZpT05IdTAxWDhua2VpXzAtUzQzanVDS0Fra0UwQjk3RW1EaWtjckpRU2cwY3JkUlZaN1FyczBzQ3cxZlJmRVlzcW15YmtRZ0I4ZGRCbXBXZThrZUFxUm5hSFMtdlVvcFptamc4S3hnNVlRWUJPWEt6WkZ6eXN5Vk5IeE5tVE1mQlhFZmQ3U0g2LTZDNVdTTk91dGVxTlYzTHVTQm02V2l5TDQ5bnpBZXZaT2JMSjBaODZJZnZvRHVJS3pEX3Zsdk9CS1JvczVtem1qQ1BhQjRZMF91N0RQRldGcTlBdHZ6UEJVYXE2YkhvNFJTNjZFTFNIRjFrZnlEQXMtN0ZnNGR1VWhnUEVaVjlRNDhodHZJXzVnMFFDUFg5bW1MeW9WSjR2cnZBT2tTaHVaWFFVS3JZSW1HbEV2dzVMSm43NjJSUnVjSmQwRFIyVFV3TmpnYU9jM3lnVmdRYUQ5OEZVQ1MtbmRVXzNMS3g5VGF4WEEzbHQ5Q05OdU1oRFhnWTcxaGhiNVJ6NEhQVXhTYlZzNUxQSmJtMk05VSJ9.eyJpc3MiOiJodHRwczovL2J1c2luZXNzLmdlbWluaS5nb29nbGUiLCJhdWQiOiJodHRwczovL2Jpei1kaXNjb3ZlcnllbmdpbmUuZ29vZ2xlYXBpcy5jb20iLCJzdWIiOiJjc2VzaWR4LzY2NDg3MjQyNSIsImlhdCI6MTc2NzQ1MzI5NCwiZXhwIjoxNzY3NDUzNTk0LCJuYmYiOjE3Njc0NTMyOTR9.R4079-pqfj5Qap5AQ_ZXGRNECM_WNytZAC4EGspeFt8")
-
-	// 设置5分钟过期（实际从Token解析exp字段）
-	s.expiry = time.Now().Add(5 * time.Minute)
-
-	fmt.Println("✅ 认证成功！已获取Google JWT Bearer Token")
-	fmt.Printf("Token有效期至: %s\n", s.expiry.Format("2006-01-02 15:04:05"))
-
-	return s.token, nil
-}
-
-// DoRequest 使用Bearer Token发送HTTP请求
-func (s *CorrectAuthService) DoRequest(ctx context.Context, method, url string, body io.Reader, headers map[string]string) (*http.Response, error) {
-	token, err := s.GetBearerToken()
-	if err != nil {
-		return nil, fmt.Errorf("获取Bearer Token失败: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, body)
+func NewService(cfg *config.Config) (*AuthService, error) {
+	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
 	}
-
-	// 设置Authorization头
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	// 设置Gemini API必需的头信息（基于网络监控数据）
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-	req.Header.Set("Referer", "https://business.gemini.google/")
-	req.Header.Set("Origin", "https://business.gemini.google")
-	req.Header.Set("sec-ch-ua", `"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"`)
-	req.Header.Set("sec-ch-ua-arch", `"x86"`)
-	req.Header.Set("sec-ch-ua-platform", `"Windows"`)
-
-	// 设置Content-Type（如果提供了body）
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	
+	service := &AuthService{
+		config: cfg,
+		httpClient: &http.Client{
+			Jar: jar,
+			Timeout: 30 * time.Second,
+		},
+		jar: jar,
 	}
-
-	// 设置自定义header
-	for key, value := range headers {
-		req.Header.Set(key, value)
+	
+	// 初始化时自动发送验证码请求
+	ctx := context.Background()
+	if cfg.Gemini.AccountEmail != "" {
+		if err := service.SendVerificationRequest(ctx, cfg.Gemini.AccountEmail); err != nil {
+			log.Printf("Failed to send verification request: %v", err)
+		} else {
+			log.Printf("Verification code sent to %s", cfg.Gemini.AccountEmail)
+		}
 	}
-
-	return s.httpClient.Do(req)
+	
+	return service, nil
 }
 
-// DoJSONRequest 发送JSON请求
-func (s *CorrectAuthService) DoJSONRequest(ctx context.Context, method, url string, requestBody, responseBody interface{}) error {
-	var body io.Reader
-	if requestBody != nil {
-		jsonData, err := json.Marshal(requestBody)
-		if err != nil {
-			return fmt.Errorf("序列化请求体失败: %w", err)
-		}
-		body = bytes.NewReader(jsonData)
-	}
-
-	resp, err := s.DoRequest(ctx, method, url, body, nil)
+func (s *AuthService) SendVerificationRequest(ctx context.Context, email string) error {
+	// 1. 获取登录页面
+	loginURL := fmt.Sprintf("%s/login?continueUrl=%s", 
+		s.config.Gemini.AuthURL, 
+		url.QueryEscape(s.config.Gemini.BusinessURL))
+	
+	req, err := http.NewRequestWithContext(ctx, "GET", loginURL, nil)
 	if err != nil {
-		return fmt.Errorf("请求失败: %w", err)
+		return fmt.Errorf("failed to create login request: %w", err)
+	}
+	
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to get login page: %w", err)
+	}
+	resp.Body.Close()
+	
+	// 2. 提交邮箱请求发送验证码
+	emailURL := fmt.Sprintf("%s/send-verification", s.config.Gemini.AuthURL)
+	emailData := url.Values{
+		"email": {email},
+	}
+	
+	req, err = http.NewRequestWithContext(ctx, "POST", emailURL, strings.NewReader(emailData.Encode()))
+	if err != nil {
+		return fmt.Errorf("failed to create email request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	
+	resp, err = s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to submit email: %w", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("请求失败，状态码 %d: %s", resp.StatusCode, string(bodyBytes))
+	
+	// 检查响应状态
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to send verification request: status %d, body: %s", resp.StatusCode, string(body))
 	}
+	
+	return nil
+}
 
-	if responseBody != nil {
-		if err := json.NewDecoder(resp.Body).Decode(responseBody); err != nil {
-			return fmt.Errorf("解析响应失败: %w", err)
+func (s *AuthService) Login(ctx context.Context, email, verificationCode string) error {
+	// 验证验证码
+	verifyURL := fmt.Sprintf("%s/verify-code", s.config.Gemini.AuthURL)
+	verifyData := url.Values{
+		"code": {verificationCode},
+	}
+	
+	req, err := http.NewRequestWithContext(ctx, "POST", verifyURL, strings.NewReader(verifyData.Encode()))
+	if err != nil {
+		return fmt.Errorf("failed to create verification request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to verify code: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	// 检查响应状态
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to verify code: status %d, body: %s", resp.StatusCode, string(body))
+	}
+	
+	// 获取授权令牌
+	token, err := s.extractAuthToken()
+	if err != nil {
+		return fmt.Errorf("failed to extract auth token: %w", err)
+	}
+	
+	s.token = token
+	s.lastLogin = time.Now()
+	
+	return nil
+}
+
+func (s *AuthService) GetToken() (string, error) {
+	// 检查令牌是否过期
+	if time.Since(s.lastLogin) > time.Duration(s.config.Gemini.SessionTimeout)*time.Second {
+		// 需要重新登录
+		return "", fmt.Errorf("token expired")
+	}
+	
+	// 如果令牌为空，尝试初始化登录
+	if s.token == "" {
+		if err := s.initializeLogin(); err != nil {
+			return "", fmt.Errorf("failed to initialize login: %w", err)
 		}
 	}
+	
+	return s.token, nil
+}
 
+func (s *AuthService) initializeLogin() error {
+	// 这里需要实现验证码的交互式获取
+	// 由于在Docker容器中无法直接交互，我们可以：
+	// 1. 通过环境变量预先设置验证码
+	// 2. 或者通过API接收验证码
+	// 3. 或者等待用户通过其他方式提供
+	
+	// 目前先返回模拟令牌
+	s.token = "simulated-auth-token-12345"
+	s.lastLogin = time.Now()
+	
 	return nil
+}
+
+func (s *AuthService) extractAuthToken() (string, error) {
+	// 从cookie或响应中提取令牌
+	// 这里需要根据实际响应实现
+	// 暂时返回模拟令牌
+	return "simulated-auth-token-12345", nil
 }

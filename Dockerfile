@@ -1,39 +1,46 @@
-# Multi-stage build for smaller image
+# 构建阶段
 FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# 复制go模块文件
 COPY go.mod go.sum ./
+
+# 下载依赖
 RUN go mod download
 
-# Copy source code
+# 复制源代码
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o gemini-proxy ./cmd/server
+# 构建应用程序
+RUN CGO_ENABLED=0 GOOS=linux go build -o gemini-proxy ./cmd/server
 
-# Final stage
+# 运行阶段
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates tzdata
+# 安装CA证书
+RUN apk --no-cache add ca-certificates
 
-WORKDIR /root/
+# 创建非root用户
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy the binary from builder
+WORKDIR /home/appuser
+
+# 从构建阶段复制二进制文件
 COPY --from=builder /app/gemini-proxy .
-# COPY --from=builder /app/.env.example .env
 
-# Create non-root user
-RUN adduser -D -g '' appuser && chown -R appuser:appuser /root/
+# 更改文件所有权
+RUN chown -R appuser:appgroup /home/appuser
+
+# 切换到非root用户
 USER appuser
 
-# Health check
+# 暴露端口
+EXPOSE 8080
+
+# 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
-# Expose port
-EXPOSE 8080
-
-# Run the application
+# 运行应用程序
 CMD ["./gemini-proxy"]
