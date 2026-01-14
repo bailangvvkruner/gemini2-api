@@ -1,38 +1,45 @@
-# 使用 zenika/alpine-chrome 作为基础镜像 - 专为无头Chrome优化
-FROM zenika/alpine-chrome:with-playwright
+# Alpine 3.19 极简版 - 最小依赖
+FROM alpine:3.19
 
-# 设置工作目录
 WORKDIR /app
 
-# 安装Python和必要依赖
+# 安装最小系统依赖
 RUN apk add --no-cache \
     python3 \
     py3-pip \
-    && ln -sf python3 /usr/bin/python
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ttf-freefont \
+    ca-certificates \
+    && rm -rf /var/cache/apk/*
 
-# 安装Python依赖
+# 创建软链接
+RUN ln -sf python3 /usr/bin/python
+
+# 复制并安装Python依赖
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 
-# 复制应用文件
+# 安装Playwright浏览器
+RUN playwright install chromium
+
+# 复制应用
 COPY multi-account-manager.py .
 COPY accounts.example.json .
 COPY setup.sh .
 COPY README_MULTI_ACCOUNT.md .
 
-# 设置环境变量
-ENV PYTHONUNBUFFERED=1
-ENV TZ=Asia/Shanghai
-
-# 创建配置目录
+RUN chmod +x setup.sh
 RUN mkdir -p /app/config
 
-# 设置权限
-RUN chmod +x setup.sh
+# 环境变量
+ENV PYTHONUNBUFFERED=1
+ENV TZ=Asia/Shanghai
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import os; os.system('ps aux | grep multi-account-manager > /dev/null')"
 
-# 默认命令
 CMD ["python", "multi-account-manager.py"]
