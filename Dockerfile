@@ -1,5 +1,5 @@
 # 使用官方Python 3.11镜像（Debian版本，更好的Playwright兼容性）
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # 设置工作目录
 WORKDIR /app
@@ -8,7 +8,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     chromium \
     chromium-driver \
-    nss \
+    libnss3 \
     libfreetype6 \
     libfreetype6-dev \
     libharfbuzz-dev \
@@ -35,9 +35,9 @@ WORKDIR /app
 # 复制系统依赖（最小化安装）
 RUN apt-get update && apt-get install -y \
     chromium \
-    nss \
+    libnss3 \
     libfreetype6 \
-    libharfbuzz0 \
+    libharfbuzz0b \
     ca-certificates \
     fonts-freefont-ttf \
     && rm -rf /var/lib/apt/lists/*
