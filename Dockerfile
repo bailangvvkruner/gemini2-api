@@ -7,7 +7,7 @@ WORKDIR /app
 # 安装系统依赖
 RUN apk add --no-cache \
     chromium \
-    chromium-driver \
+    chromium-chromedriver \
     nss \
     freetype \
     freetype-dev \
