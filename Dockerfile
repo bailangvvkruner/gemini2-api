@@ -1,50 +1,18 @@
-# 使用官方Python 3.11镜像（Debian版本，更好的Playwright兼容性）
-FROM python:3.11-slim AS builder
+# 使用 zenika/alpine-chrome 作为基础镜像 - 专为无头Chrome优化
+FROM zenika/alpine-chrome:with-playwright
 
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖（构建阶段）
-RUN apt-get update && apt-get install -y \
-    chromium \
-    chromium-driver \
-    libnss3 \
-    libfreetype6 \
-    libfreetype6-dev \
-    libharfbuzz-dev \
-    ca-certificates \
-    fonts-freefont-ttf \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# 复制依赖文件（利用Docker缓存）
-COPY requirements.txt .
+# 安装Python和必要依赖
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    && ln -sf python3 /usr/bin/python
 
 # 安装Python依赖
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# 安装Playwright浏览器
-RUN playwright install chromium
-
-# 最终阶段
-FROM python:3.11-slim
-
-# 设置工作目录
-WORKDIR /app
-
-# 复制系统依赖（最小化安装）
-RUN apt-get update && apt-get install -y \
-    chromium \
-    libnss3 \
-    libfreetype6 \
-    libharfbuzz0b \
-    ca-certificates \
-    fonts-freefont-ttf \
-    && rm -rf /var/lib/apt/lists/*
-
-# 从构建阶段复制已安装的Python包
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
 
 # 复制应用文件
 COPY multi-account-manager.py .
