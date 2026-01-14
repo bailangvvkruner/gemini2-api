@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # 服务1：API代理服务（Python版本）
+  gemini-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gemini-proxy
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - BEARER_TOKEN=${BEARER_TOKEN}
+      - CONFIG_ID=${CONFIG_ID}
+      - PORT=8080
+      - DEBUG=${DEBUG:-false}
+      - PROXY_URL=${PROXY_URL:-}
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./config:/app/config
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gemini-network
+
+  # 服务2：账号管理器（可选）
+  gemini-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gemini-manager
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./accounts.json:/app/accounts.json:ro
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: ["python", "multi-account-manager.py"]
+    depends_on:
+      - gemini-proxy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gemini-network
+
+networks:
+  gemini-network:
+    driver: bridge

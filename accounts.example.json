@@ -1,0 +1,31 @@
+{
+  "accounts": [
+    {
+      "email": "user1@example.com",
+      "password": "",
+      "bearer_token": "",
+      "config_id": "",
+      "last_used": 0,
+      "usage_count": 0,
+      "is_active": true
+    },
+    {
+      "email": "user2@example.com",
+      "password": "",
+      "bearer_token": "",
+      "config_id": "",
+      "last_used": 0,
+      "usage_count": 0,
+      "is_active": true
+    },
+    {
+      "email": "user3@example.com",
+      "password": "",
+      "bearer_token": "",
+      "config_id": "",
+      "last_used": 0,
+      "usage_count": 0,
+      "is_active": true
+    }
+  ]
+}

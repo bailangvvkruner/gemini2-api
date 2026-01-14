@@ -1,0 +1,40 @@
+# 环境变量文件
+.env
+.env.local
+.env.production
+
+# 敏感信息
+*.key
+*.pem
+*.crt
+*.p12
+
+# Go
+go.sum
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Docker
+.dockerignore
+*.tar
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+*.exe

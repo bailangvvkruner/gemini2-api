@@ -1,36 +1,46 @@
-# 使用Alpine Linux减小镜像大小
-FROM node:18-alpine
+# 使用官方Python 3.11镜像
+FROM python:3.11-alpine
 
-# 安装必要的依赖，包括Chromium和必要的库
-RUN apk update && apk add --no-cache \
+# 设置工作目录
+WORKDIR /app
+
+# 安装系统依赖
+RUN apk add --no-cache \
     chromium \
+    chromium-driver \
     nss \
     freetype \
     freetype-dev \
     harfbuzz \
     ca-certificates \
-    ttf-freefont \
-    font-noto-emoji \
-    && rm -rf /var/cache/apk/*
+    ttf-freefont
 
-# 设置环境变量，让Puppeteer使用已安装的Chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+# 安装Python依赖
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 创建工作目录
-WORKDIR /app
+# 安装Playwright浏览器
+RUN playwright install chromium
 
-# 复制package.json文件
-COPY package*.json ./
+# 复制应用文件
+COPY multi-account-manager.py .
+COPY accounts.example.json .
+COPY setup.sh .
+COPY README_MULTI_ACCOUNT.md .
 
-# 安装依赖
-RUN npm install
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1
+ENV TZ=Asia/Shanghai
 
-# 复制应用代码
-COPY . .
+# 创建配置目录
+RUN mkdir -p /app/config
 
-# 暴露端口（如果需要Web服务器）
-EXPOSE 3000
+# 设置权限
+RUN chmod +x setup.sh
 
-# 启动应用
-CMD ["node", "server.js"]
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import os; os.system('ps aux | grep multi-account-manager > /dev/null')"
+
+# 默认命令
+CMD ["python", "multi-account-manager.py"]
