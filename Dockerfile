@@ -1,36 +1,35 @@
-# Alpine 3.19 极简版 - 最小依赖
-FROM alpine:3.19
+# Debian Slim - 最可靠的方案（推荐）
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# 安装最小系统依赖
-RUN apk add --no-cache \
-    python3 \
-    py3-pip \
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
     chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    ttf-freefont \
+    chromium-driver \
+    libnss3 \
+    libfreetype6 \
+    libharfbuzz0b \
     ca-certificates \
-    && rm -rf /var/cache/apk/*
+    fonts-freefont-ttf \
+    && rm -rf /var/lib/apt/lists/*
 
-# 创建软链接
-RUN ln -sf python3 /usr/bin/python
-
-# 复制并安装Python依赖
+# 复制依赖文件
 COPY requirements.txt .
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+
+# 安装Python依赖（Playwright 官方支持 Debian）
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 安装Playwright浏览器
 RUN playwright install chromium
 
-# 复制应用
+# 复制应用文件
 COPY multi-account-manager.py .
 COPY accounts.example.json .
 COPY setup.sh .
 COPY README_MULTI_ACCOUNT.md .
 
+# 设置权限
 RUN chmod +x setup.sh
 RUN mkdir -p /app/config
 
